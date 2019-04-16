@@ -5,8 +5,8 @@
 
 .dokuwiki div.cloud a { padding: 0; margin: 0 0.5ex; }
 
-@l: 10%; /* Percentage to lighten the original color. */
-@d: 15%; /* Percentage to desaturate the original color. */
+@l: 5%; /* Percentage to lighten the original color. */
+@d: 10%; /* Percentage to desaturate the original color. */
 
 /* Font sizes from largest to smallest font. */
 @f5: 130% * @sF;
@@ -15,7 +15,7 @@
 @f2: 85%  * @sF;
 @f1: 70%  * @sF;
 
-@c0: #003F9E;
+@c0: #317eac;
 .dokuwiki div.cloud a.cloud1 { font-size: @f1; color: desaturate(lighten(@c0, 4 * @l), 4 * @d); }
 .dokuwiki div.cloud a.cloud2 { font-size: @f2; color: desaturate(lighten(@c0, 3 * @l), 3 * @d); }
 .dokuwiki div.cloud a.cloud3 { font-size: @f3; color: desaturate(lighten(@c0, 2 * @l), 2 * @d); }
