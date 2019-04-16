@@ -12,10 +12,11 @@ if (!defined('DOKU_LF')) define('DOKU_LF', "\n");
 if (!defined('DOKU_TAB')) define('DOKU_TAB', "\t");
 if (!defined('DOKU_PLUGIN')) define('DOKU_PLUGIN',DOKU_INC.'lib/plugins/');
 
+require_once(DOKU_INC.'inc/pageutils.php');
 require_once(DOKU_PLUGIN.'syntax.php');
 
 class syntax_plugin_cloud extends DokuWiki_Syntax_Plugin {
-    protected $knownFlags = array('showCount');
+    protected $knownFlags = array('showCount', 'countInPage');
     protected $stopwords = null;
 
     /**
@@ -40,6 +41,8 @@ class syntax_plugin_cloud extends DokuWiki_Syntax_Plugin {
             $type = 'tag';
         } elseif (substr($match, 0, 6) == 'SEARCH') {
             $type = 'search';
+        } elseif (substr($match, 0, 4) == 'PAGE') {
+            $type = 'page';
         } else {
             $type = 'word';
         }
@@ -97,6 +100,8 @@ class syntax_plugin_cloud extends DokuWiki_Syntax_Plugin {
                     msg('You have to install the searchstats plugin to use this feature.', -1);
                     return false;
                 }
+            } elseif($type == 'page') {
+                $cloud = $this->_getPageWordCloud($num, $min, $max, $flags['countInPage']);
             } else {
                 $cloud = $this->_getWordCloud($num, $min, $max);
             }
@@ -240,6 +245,73 @@ class syntax_plugin_cloud extends DokuWiki_Syntax_Plugin {
             $word_idx = file($conf['cachedir'].'/word.idx');
 
             $this->_addWordsToCloud($cloud, $idx, $word_idx);
+        }
+
+        $this->_filterCloud($cloud, 'word_blacklist');
+
+        return $this->_sortCloud($cloud, $num, $min, $max);
+    }
+
+    # This duplicates the protected function in inc/indexer.php
+    function _Indexer_getIndexKey($idx, $suffix, $id) {
+        global $conf;
+        $fn = $conf['indexdir'].'/'.$idx.$suffix.'.idx';
+        if (!file_exists($fn)) return '';
+        $fh = @fopen($fn, 'r');
+        if (!$fh) return '';
+        $ln = -1;
+        while (($line = fgets($fh)) !== false) {
+            if (++$ln == $id) break;
+        }
+        fclose($fh);
+        return rtrim((string)$line);
+    }
+
+    function _getPageWordCloud($num, &$min, &$max, $countInPage) {
+        global $conf;
+
+        $cloud = array();
+
+        if (@file_exists($conf['indexdir'].'/page.idx')) { // new word-length based index
+            require_once(DOKU_INC.'inc/indexer.php');
+
+            $Indexer = idx_get_indexer();
+            $pages = $Indexer->getPages();
+
+            $pid = array_search(getID(), $pages, true);
+            if ($pid === false) {
+                # Page is not in index -> return empty cloud
+                return $cloud;
+            }
+
+            $pageword_idx = $this->_Indexer_getIndexKey('pageword', '', $pid);
+            $words = explode(':', $pageword_idx);
+
+            foreach ($words as $word) {
+                if ($word != '') {
+                    list($wlen, $wid) = explode('*', $word);
+                    $idx = $this->_Indexer_getIndexKey('i', $wlen, $wid);
+                    $word_idx = $this->_Indexer_getIndexKey('w', $wlen, $wid);
+
+                    $parts = explode(':', $idx);
+                    if ($countInPage) {
+                        # Search for our page id and record word frequency
+                        foreach ($parts as $tuple) {
+                            if ($tuple === '') continue;
+                            list($tuple_pid, $tuple_freq) = explode('*', $tuple);
+                            if ($tuple_pid == $pid) {
+                                $cloud[$word_idx] = $tuple_freq;
+                                break;
+                            }
+                        }
+                    } else {
+                        # Record number of pages containing the word
+                        $cloud[$word_idx] = count($parts);
+                    }
+                }
+            }
+        } else {                                          // old index
+            # Not implemented (yet)
         }
 
         $this->_filterCloud($cloud, 'word_blacklist');
